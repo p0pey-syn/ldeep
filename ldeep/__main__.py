@@ -894,7 +894,7 @@ class Ldeep(Command):
             try:
                 results = list(
                     self.engine.query(
-                        self.engine.ZONE_FILTER(),
+                        self.engine.DNS_FILTER(),
                         attributes,
                         base=f"{basePre},{baseSuf}",
                     )
@@ -905,11 +905,7 @@ class Ldeep(Command):
             else:
                 filteredResults = []
                 for result in results:
-                    result["dnsRecord"] = list(
-                        filter(lambda rec: rec != "", result["dnsRecord"])
-                    )
-                    if len(result["dnsRecord"]) > 0:
-                        filteredResults.append(result)
+                    filteredResults.append(result)
 
                 if len(filteredResults) > 0:
                     if verbose:

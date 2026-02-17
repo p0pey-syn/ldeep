@@ -114,7 +114,7 @@ class CacheActiveDirectoryView(ActiveDirectoryView):
         "fmt": "json",
         "files": ["zones"],
     }
-    ZONE_FILTER = lambda _: {
+    DNS_FILTER = lambda _: {
         "fmt": "json",
         "files": ["dns_records"],
     }
