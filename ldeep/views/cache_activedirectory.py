@@ -84,7 +84,7 @@ class CacheActiveDirectoryView(ActiveDirectoryView):
     }
     ACCOUNTS_IN_GROUP_FILTER = lambda _, p, g: {
         "fmt": "json",
-        "files": ["users_all", "groups", "machines"],
+        "files": ["users_all", "smsa", "gmsa", "groups", "machines"],
         "filter": lambda x: ("primaryGroupID" in x and eq(p, x["primaryGroupID"]))
         or ("memberOf" in x and g in x["memberOf"]),
     }
