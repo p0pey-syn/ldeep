@@ -2,7 +2,7 @@
 
 import sys
 from argparse import ArgumentParser
-from base64 import b64encode
+from base64 import b64encode, b64decode
 from datetime import date, datetime, timedelta
 from json import dump as json_dump
 from itertools import chain
@@ -1251,7 +1251,7 @@ class Ldeep(Command):
         """
         try:
             verbose = kwargs.get("verbose", False)
-            attributes = ALL if verbose else ["member", "msDS-ShadowPrincipalSid"]
+            attributes = ALL if verbose else ["name", "member", "msDS-ShadowPrincipalSid"]
             base = ",".join(
                 [
                     "CN=Shadow Principal Configuration,CN=Services,CN=Configuration",
@@ -1270,10 +1270,14 @@ class Ldeep(Command):
                 self.display(entries, verbose)
             else:
                 for entry in entries:
-                    for user in entry.get("member", []):
-                        print(
-                            f"User {entry['member'][0]} added to Group {format_sid(entry['msDS-ShadowPrincipalSid'])}"
-                        )
+                    shadow_principal_sid = entry['msDS-ShadowPrincipalSid']
+                    if isinstance(shadow_principal_sid, str):
+                        shadow_principal_sid = b64decode(shadow_principal_sid.encode('ascii'))
+
+                    print(f"Members of the shadow principal {entry['name']} (shadow principal SID: {format_sid(shadow_principal_sid)}):")
+                    for member in entry.get("member", []):
+                        print(f"{member:>{len(member) + 4}}")
+
         except (LDAPAttributeError, LDAPObjectClassError) as e:
             error(
                 f"{e}. The domain's functional level may be too old",
@@ -1522,6 +1526,7 @@ class Ldeep(Command):
             "foreignSecurityPrincipal": "FSP",
             "computer": "computer"
         }
+        FSP_CONTAINER_DN = ",".join(["CN=ForeignSecurityPrincipals", self.engine.base_dn])
 
         target_group = kwargs["group"]
         verbose = kwargs.get("verbose", False)
@@ -1602,7 +1607,7 @@ class Ldeep(Command):
                     yield {"dn": direct_member_dn, "distinguishedName": direct_member_dn}
                 else:
                     suffix = "trusted"
-                    if "CN=ForeignSecurityPrincipals" in direct_member_dn:
+                    if direct_member_dn.endswith(FSP_CONTAINER_DN):
                         suffix = CLASS_SUFFIX_MAP["foreignSecurityPrincipal"]
 
                     print(
@@ -1638,12 +1643,17 @@ class Ldeep(Command):
             @verbose:bool
                 Results will contain full information
             @samaccountname:bool
-                Show the sAMAccountName's of the members of `group` instead of their DN's, where possible
+                Show the sAMAccountName's of the groups to which `object` belongs instead of their DN's, where possible
             @recursive:bool
                 List recursively the groups
             #account:string
                 Object to list memberships (sAMAccountName)
         """
+        SHADOW_PRINCIPAL_CONTAINER_DN = ",".join([
+            "CN=Shadow Principal Configuration,CN=Services,CN=Configuration",
+            self.engine.base_dn
+        ])
+
         target_account = kwargs["account"]
         verbose = kwargs.get("verbose", False)
         prefer_samaccountname = kwargs.get("samaccountname", False)
@@ -1660,6 +1670,15 @@ class Ldeep(Command):
                 )
             )
 
+            # Particular case: the object may be a member of a shadow principal instead of a group
+            if not results:
+                results = list(
+                    self.engine.query(
+                        self.engine.DISTINGUISHED_NAME(group_dn),
+                        base = SHADOW_PRINCIPAL_CONTAINER_DN
+                    )
+                )
+
             if not results:
                 return
 
@@ -1671,11 +1690,15 @@ class Ldeep(Command):
                 display_name = group_dn
                 if prefer_samaccountname:
                     display_name = group_obj.get("sAMAccountName", display_name)
-                
+
+                suffix = "group"
+                if display_name.endswith(SHADOW_PRINCIPAL_CONTAINER_DN):
+                    suffix = "shadow principal"
+
                 print(
                     "{p:>{width}}".format(
-                        p=str(display_name),
-                        width=depth + len(str(display_name)),
+                        p=str(display_name + " (" + suffix + ")"),
+                        width=depth + len(str(display_name + " (" + suffix + ")")),
                     )
                 )
 
