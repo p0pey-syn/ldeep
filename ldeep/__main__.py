@@ -1529,7 +1529,7 @@ class Ldeep(Command):
         recursive = kwargs.get("recursive", False)
 
         visited_groups = set()
-        
+
         def process_group(group_dn, group_sid, group_samaccountname, depth):
             if group_dn in visited_groups:
                 return
@@ -1556,12 +1556,12 @@ class Ldeep(Command):
                 found_member_dns.add(dn)
                 samaccountname = member.get("sAMAccountName", dn)
                 object_class = member.get("objectClass", [])
-                
+
                 suffix = next(
                     (mapped for cl, mapped in CLASS_SUFFIX_MAP.items() if cl in object_class),
                     "user"
                 )
-              
+
                 if verbose:
                     yield member
                 else:
@@ -1611,7 +1611,7 @@ class Ldeep(Command):
                             width=depth + len(direct_member_dn + " (" + suffix + ")")
                         )
                     )
-        
+
         # Entry point
         results = list(
             self.engine.query(
@@ -1652,8 +1652,6 @@ class Ldeep(Command):
         visited_groups = set()
 
         def process_group(group_dn, depth):
-            if group_dn in visited_groups:
-                return
             visited_groups.add(group_dn)
 
             results = list(
@@ -1666,7 +1664,7 @@ class Ldeep(Command):
                 return
 
             group_obj = results[0]
-            
+
             if verbose:
                 yield group_obj
             else:
@@ -1683,6 +1681,8 @@ class Ldeep(Command):
 
             if recursive and "memberOf" in group_obj:
                 for parent_dn in group_obj["memberOf"]:
+                    if parent_dn in visited_groups:
+                        return
                     yield from process_group(parent_dn, depth + 4)
 
         # Entry point
@@ -1725,7 +1725,7 @@ class Ldeep(Command):
             groups = target_obj["memberOf"]
             for group_dn in groups:
                 groups_from_memberof.append(process_group(group_dn, 0))
-        
+
         flat_groups_from_memberof = chain.from_iterable(groups_from_memberof)
         self.display(chain(groups_from_primary_group, flat_groups_from_memberof), verbose)
 
