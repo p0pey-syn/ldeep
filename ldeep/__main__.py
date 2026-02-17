@@ -2,28 +2,28 @@
 
 import sys
 from argparse import ArgumentParser
-from base64 import b64encode, b64decode
+from base64 import b64decode, b64encode
 from datetime import date, datetime, timedelta
-from json import dump as json_dump
 from itertools import chain
+from json import dump as json_dump
 from math import fabs
 from re import compile as re_compile
 from time import sleep
 from uuid import UUID
 
+from commandparse import Command
 from Cryptodome.Cipher import AES
 from Cryptodome.Hash import MD4, SHA1
 from Cryptodome.Protocol.KDF import PBKDF2
-
-from commandparse import Command
 from ldap3.core import results as coreResults
 from ldap3.core.exceptions import LDAPAttributeError, LDAPObjectClassError
 from ldap3.protocol.formatters.formatters import format_sid
 from pyasn1.error import PyAsn1UnicodeDecodeError
 
 from ldeep._version import __version__
-from ldeep.utils import Logger, error, info
+from ldeep.utils import Logger, error, get_key_for_value, info
 from ldeep.utils import resolve as utils_resolve
+from ldeep.utils.protections import checkProtections
 from ldeep.utils.sddl import parse_ntSecurityDescriptor
 from ldeep.views.activedirectory import (
     ALL,
@@ -35,14 +35,12 @@ from ldeep.views.cache_activedirectory import CacheActiveDirectoryView
 from ldeep.views.constants import (
     FILETIME_TIMESTAMP_FIELDS,
     FOREST_LEVELS,
+    GMSA_ENCRYPTION_CONSTANTS,
     LDAP_SERVER_SD_FLAGS_OID_SEC_DESC,
     USER_ACCOUNT_CONTROL,
-    GMSA_ENCRYPTION_CONSTANTS,
 )
-from ldeep.views.structures import MSDS_MANAGEDPASSWORD_BLOB
 from ldeep.views.ldap_activedirectory import LdapActiveDirectoryView
-from ldeep.utils.protections import checkProtections
-from ldeep.utils import get_key_for_value
+from ldeep.views.structures import MSDS_MANAGEDPASSWORD_BLOB
 
 
 class Ldeep(Command):
@@ -1251,7 +1249,9 @@ class Ldeep(Command):
         """
         try:
             verbose = kwargs.get("verbose", False)
-            attributes = ALL if verbose else ["name", "member", "msDS-ShadowPrincipalSid"]
+            attributes = (
+                ALL if verbose else ["name", "member", "msDS-ShadowPrincipalSid"]
+            )
             base = ",".join(
                 [
                     "CN=Shadow Principal Configuration,CN=Services,CN=Configuration",
@@ -1270,11 +1270,15 @@ class Ldeep(Command):
                 self.display(entries, verbose)
             else:
                 for entry in entries:
-                    shadow_principal_sid = entry['msDS-ShadowPrincipalSid']
+                    shadow_principal_sid = entry["msDS-ShadowPrincipalSid"]
                     if isinstance(shadow_principal_sid, str):
-                        shadow_principal_sid = b64decode(shadow_principal_sid.encode('ascii'))
+                        shadow_principal_sid = b64decode(
+                            shadow_principal_sid.encode("ascii")
+                        )
 
-                    print(f"Members of the shadow principal {entry['name']} (shadow principal SID: {format_sid(shadow_principal_sid)}):")
+                    print(
+                        f"Members of the shadow principal {entry['name']} (shadow principal SID: {format_sid(shadow_principal_sid)}):"
+                    )
                     for member in entry.get("member", []):
                         print(f"{member:>{len(member) + 4}}")
 
@@ -1524,9 +1528,11 @@ class Ldeep(Command):
             "msDS-ManagedServiceAccount": "sMSA",
             "msDS-GroupManagedServiceAccount": "gMSA",
             "foreignSecurityPrincipal": "FSP",
-            "computer": "computer"
+            "computer": "computer",
         }
-        FSP_CONTAINER_DN = ",".join(["CN=ForeignSecurityPrincipals", self.engine.base_dn])
+        FSP_CONTAINER_DN = ",".join(
+            ["CN=ForeignSecurityPrincipals", self.engine.base_dn]
+        )
 
         target_group = kwargs["group"]
         verbose = kwargs.get("verbose", False)
@@ -1563,8 +1569,12 @@ class Ldeep(Command):
                 object_class = member.get("objectClass", [])
 
                 suffix = next(
-                    (mapped for cl, mapped in CLASS_SUFFIX_MAP.items() if cl in object_class),
-                    "user"
+                    (
+                        mapped
+                        for cl, mapped in CLASS_SUFFIX_MAP.items()
+                        if cl in object_class
+                    ),
+                    "user",
                 )
 
                 if verbose:
@@ -1577,7 +1587,7 @@ class Ldeep(Command):
                     print(
                         "{p:>{width}}".format(
                             p=display_name + " (" + suffix + ")",
-                            width=depth + len(display_name + " (" + suffix + ")")
+                            width=depth + len(display_name + " (" + suffix + ")"),
                         )
                     )
 
@@ -1604,7 +1614,10 @@ class Ldeep(Command):
                     continue
 
                 if verbose:
-                    yield {"dn": direct_member_dn, "distinguishedName": direct_member_dn}
+                    yield {
+                        "dn": direct_member_dn,
+                        "distinguishedName": direct_member_dn,
+                    }
                 else:
                     suffix = "trusted"
                     if direct_member_dn.endswith(FSP_CONTAINER_DN):
@@ -1613,7 +1626,7 @@ class Ldeep(Command):
                     print(
                         "{p:>{width}}".format(
                             p=direct_member_dn + " (" + suffix + ")",
-                            width=depth + len(direct_member_dn + " (" + suffix + ")")
+                            width=depth + len(direct_member_dn + " (" + suffix + ")"),
                         )
                     )
 
@@ -1649,10 +1662,12 @@ class Ldeep(Command):
             #account:string
                 Object to list memberships (sAMAccountName)
         """
-        SHADOW_PRINCIPAL_CONTAINER_DN = ",".join([
-            "CN=Shadow Principal Configuration,CN=Services,CN=Configuration",
-            self.engine.base_dn
-        ])
+        SHADOW_PRINCIPAL_CONTAINER_DN = ",".join(
+            [
+                "CN=Shadow Principal Configuration,CN=Services,CN=Configuration",
+                self.engine.base_dn,
+            ]
+        )
 
         target_account = kwargs["account"]
         verbose = kwargs.get("verbose", False)
@@ -1675,7 +1690,7 @@ class Ldeep(Command):
                 results = list(
                     self.engine.query(
                         self.engine.DISTINGUISHED_NAME(group_dn),
-                        base = SHADOW_PRINCIPAL_CONTAINER_DN
+                        base=SHADOW_PRINCIPAL_CONTAINER_DN,
                     )
                 )
 
@@ -1730,11 +1745,7 @@ class Ldeep(Command):
         if "primaryGroupID" in target_obj and target_obj["primaryGroupID"]:
             try:
                 pgid = target_obj["primaryGroupID"]
-                pg_res = list(
-                    self.engine.query(
-                        self.engine.PRIMARY_GROUP_ID(pgid)
-                    )
-                )
+                pg_res = list(self.engine.query(self.engine.PRIMARY_GROUP_ID(pgid)))
                 if pg_res:
                     pg_dn = pg_res[0].get("distinguishedName")
                     if pg_dn:
@@ -1750,7 +1761,9 @@ class Ldeep(Command):
                 groups_from_memberof.append(process_group(group_dn, 0))
 
         flat_groups_from_memberof = chain.from_iterable(groups_from_memberof)
-        self.display(chain(groups_from_primary_group, flat_groups_from_memberof), verbose)
+        self.display(
+            chain(groups_from_primary_group, flat_groups_from_memberof), verbose
+        )
 
     def get_from_sid(self, kwargs):
         """
