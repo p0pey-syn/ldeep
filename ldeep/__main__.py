@@ -1676,18 +1676,18 @@ class Ldeep(Command):
                 stop_recursion = True
             visited_groups.add(group_dn)
 
-            results = list(
-                self.engine.query(
-                    self.engine.DISTINGUISHED_NAME(group_dn),
-                )
-            )
+            results = list(self.engine.query(self.engine.DISTINGUISHED_NAME(group_dn)))
 
             # Particular case: the object may be a member of a shadow principal instead of a group
             if not results:
                 results = list(
                     self.engine.query(
                         self.engine.DISTINGUISHED_NAME(group_dn),
-                        base=SHADOW_PRINCIPAL_CONTAINER_DN,
+                        base=(
+                            None
+                            if isinstance(self.engine, CacheActiveDirectoryView)
+                            else SHADOW_PRINCIPAL_CONTAINER_DN
+                        ),
                     )
                 )
 
