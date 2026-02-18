@@ -1512,8 +1512,8 @@ class Ldeep(Command):
         Arguments:
             @verbose:bool
                 Results will contain full information
-            @samaccountname:bool
-                Show the sAMAccountName's of the members of `group` instead of their DN's, where possible
+            @dn:bool
+                Show the DNs of the members of `group` instead of their sAMAccountNames
             @recursive:bool
                 List recursively the members of `group`
             #group:string
@@ -1532,7 +1532,7 @@ class Ldeep(Command):
 
         target_group = kwargs["group"]
         verbose = kwargs.get("verbose", False)
-        prefer_samaccountname = kwargs.get("samaccountname", False)
+        prefer_dn = kwargs.get("dn", False)
         recursive = kwargs.get("recursive", False)
 
         visited_groups = set()
@@ -1576,9 +1576,9 @@ class Ldeep(Command):
                 if verbose:
                     yield member
                 else:
-                    display_name = dn
-                    if prefer_samaccountname:
-                        display_name = samaccountname
+                    display_name = samaccountname
+                    if prefer_dn:
+                        display_name = dn
 
                     print(
                         "{p:>{width}}".format(
@@ -1651,8 +1651,8 @@ class Ldeep(Command):
         Arguments:
             @verbose:bool
                 Results will contain full information
-            @samaccountname:bool
-                Show the sAMAccountName's of the groups to which `object` belongs instead of their DN's, where possible
+            @dn:bool
+                Show the DNs of the groups to which `object` belongs instead of their sAMAccountNames
             @recursive:bool
                 List recursively the groups
             #account:string
@@ -1667,7 +1667,7 @@ class Ldeep(Command):
 
         target_account = kwargs["account"]
         verbose = kwargs.get("verbose", False)
-        prefer_samaccountname = kwargs.get("samaccountname", False)
+        prefer_dn = kwargs.get("dn", False)
         recursive = kwargs.get("recursive", False)
 
         visited_groups = set()
@@ -1698,9 +1698,9 @@ class Ldeep(Command):
             if verbose:
                 yield group_obj
             else:
-                display_name = group_dn
-                if prefer_samaccountname:
-                    display_name = group_obj.get("sAMAccountName", display_name)
+                display_name = group_obj.get("sAMAccountName", group_dn)
+                if prefer_dn:
+                    display_name = group_dn
 
                 suffix = "group"
                 if display_name.endswith(SHADOW_PRINCIPAL_CONTAINER_DN):
