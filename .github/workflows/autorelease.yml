@@ -101,7 +101,7 @@ jobs:
 
   macos-amd-build:
     name: MacOS AMD64 Build
-    runs-on: "macos-13"
+    runs-on: "macos-15-intel"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
