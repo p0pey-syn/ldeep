@@ -74,6 +74,10 @@ class CacheActiveDirectoryView(ActiveDirectoryView):
         "files": ["machines"],
         "filter": lambda x: True if n == "*" else eq(x["cn"], n),
     }
+    DC_FILTER = lambda _: {
+        "files": ["machines"],
+        "filter": lambda x: True if int(x["primaryGroupID"]) == 516 else False,
+    }
     ANR = lambda _, u: {
         "files": ["users_all", "groups", "machines"],
         "filter": lambda record: eq_anr(record, u),
